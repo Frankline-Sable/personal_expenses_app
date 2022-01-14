@@ -25,7 +25,37 @@ class MyAppState extends State<MyApp> {
     Transactions('t2', "Chicken at KFC", DateTime.now(), 12.46),
     Transactions('t3', "Lazy purchases", DateTime.now(), 28.22)
   ];
+  double get totalSpending{
+    return groupedTransactionsValues.fold(0.0, (sum,item){
+      return sum + (item['amount'] as double);
+    });
+  }
+  List<Transactions> get recentTransactions{
+    return _userTransactions.where((tx){
+      return tx.date.isAfter(
+        DateTime.now().subtract(
+          Duration(days: 7),
+        ),
+      );
+    }).toList();
+  }
 
+  List<Map<String, Object>> get groupedTransactionsValues {
+    return List.generate(7, (index) {
+
+      final weekDay = DateTime.now().subtract(Duration(days: index));
+      var totalSum = 0.0;
+      for (var i = 0; i < recentTransactions.length; i++) {
+        if (recentTransactions[i].date.day == weekDay.day &&
+            recentTransactions[i].date.month == weekDay.month &&
+            recentTransactions[i].date.year == weekDay.year) {
+          totalSum += recentTransactions[i].amount;
+        }
+      }
+
+      return {'day': DateFormat.E().format(weekDay).substring(0,1), 'amount': totalSum};
+    }).reversed.toList();
+  }
   void _addNewTransaction() {
     if (titleController.text == null ||
         amountController.text == null ||
@@ -38,12 +68,15 @@ class MyAppState extends State<MyApp> {
           titleController.text,
           _selectedDateTime,
           double.parse(amountController.text)));
-    }
-
-    );
-   Navigator.of(context).pop();
-
-
+    });
+    Navigator.of(context).pop();
+  }
+  void _removeTransaction(String id){
+    setState(() {
+      _userTransactions.removeWhere((element){
+        return element.id==id;
+      });
+    });
   }
 
   void _showNewTransaction(BuildContext ctx) {
@@ -139,71 +172,93 @@ class MyAppState extends State<MyApp> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 16),
                 child: Card(
                   elevation: 10,
-                  margin: EdgeInsets.all(10),
+                  margin: EdgeInsets.symmetric(vertical: 4,horizontal: 10),
                   child: Container(
                     padding: EdgeInsets.symmetric(horizontal: 10, vertical: 20),
-                    child: Text("This is will be the heading "),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: groupedTransactionsValues.map((data){
+                        return Container(
+                          child: Column(
+                              children: [
+                                Text("\$"),
+                                Container(
+                                  margin: EdgeInsets.symmetric(vertical: 8),
+                                  width: 10,
+                                  height: 60,
+                                  decoration: BoxDecoration(color: Color.fromRGBO(211, 211, 211, 1), borderRadius:BorderRadius.circular(30) ),
+                                  child: Stack(
+                                    children: [
+                                      FractionallySizedBox(
+                                        heightFactor:(totalSpending==0.0?0.0:(data['amount'] as double)/totalSpending),
+                                        child: Container(
+                                          decoration: BoxDecoration(color: Colors.amber, borderRadius:BorderRadius.circular(30) ),
+                                        ),
+                                      )
+                                    ],
+                                  ),
+                                ),
+                                Text(data['day'] as String)
+                              ],
+                            )
+                        );
+                      }).toList(),
+
+
+                    )
                   ),
                 )),
             Container(
               height: 500,
-              child: ListView.builder(
+              child: _userTransactions.length>0?
+              ListView.builder(
                   itemCount: _userTransactions.length,
                   itemBuilder: (BuildContext context, int index) {
-                    return Padding(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        child: Card(
-                          elevation: 10,
-                          margin: EdgeInsets.all(10),
-                          child: Container(
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 20),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 5),
-                                    decoration: BoxDecoration(
-                                        border: Border.all(
-                                            color: Colors.black, width: 2.0),
-                                        borderRadius: BorderRadius.all(
-                                            Radius.circular(10))),
-                                    child: Text(
-                                      "\$ ${_userTransactions[index].amount}",
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 20),
-                                    ),
-                                  ),
-                                  Container(
-                                    padding:
-                                        EdgeInsets.symmetric(horizontal: 16),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Padding(
-                                            padding: EdgeInsets.symmetric(
-                                                vertical: 10),
-                                            child: Text(
-                                              _userTransactions[index].title,
-                                              style: TextStyle(
-                                                  fontWeight: FontWeight.w600,
-                                                  fontSize: 18),
-                                            )),
-                                        Text(DateFormat.yMMMMEEEEd().format(
-                                            _userTransactions[index].date))
-                                      ],
-                                    ),
-                                  )
-                                ],
+                    return Card(
+                        margin: EdgeInsets.symmetric(vertical: 8,horizontal: 16),
+                        elevation: 3,
+                        child: ListTile(
+                          contentPadding: EdgeInsets.symmetric(vertical: 8,horizontal: 10),
+                          trailing: IconButton(
+                            icon: Icon(Icons.delete), onPressed: () {
+                            _removeTransaction(_userTransactions[index].id);
+                          },
+                          ),
+                          leading: CircleAvatar(
+                            radius: 30,
+
+                            child: Text(
+                              "\$ ${_userTransactions[index].amount}",
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w800, fontSize: 14),
+                            ),
+                          ),
+                          title: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 10),
+                              child: Text(
+                                _userTransactions[index].title,
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w600, fontSize: 18),
                               )),
+                          subtitle: Text(DateFormat.yMMMMEEEEd()
+                              .format(_userTransactions[index].date)),
                         ));
-                  }),
+                  })
+              :
+                Column(
+                  children: [
+                    Image.asset(
+                        'assets/images/prohibited_48px.png', fit: BoxFit.cover
+                    ),
+                    SizedBox(height: 10),
+                    Text(
+                      "No transactions available"
+                    )
+                  ],
+                )
             )
           ],
         ),
